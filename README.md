@@ -1,4 +1,4 @@
-# Slime Outpost
+# Slime Merge
 
 A top-down, cozy forest merge-defense game. Open `index.html` in a browser, or serve this directory with `python3 -m http.server 8000` and visit http://localhost:8000.
 
@@ -23,7 +23,7 @@ Built against https://runxr.app/docs. The optional SDK reports ready status and 
 
 Upload the static files `index.html`, `style.css`, and `game.js`, or host them at a public HTTPS URL that allows iframe embedding. `little-outpost.zip` contains these files. In RunXR Dev Studio, add a draft with:
 
-- Title: Slime Outpost
+- Title: Slime Merge
 - Category: Strategy / Merge (choose the closest available category)
 - Description: Small slimes. Big last stand. Recruit a crew of little bow-wielding heroes, merge them into stronger defenders, and protect your forest outpost from wandering zombies.
 - Features: Gamepad Controls, Screen Controls
