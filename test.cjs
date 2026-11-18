@@ -4,22 +4,38 @@ const context=vm.createContext({handlers,document:{body:{classList:{toggle(){}}}
 vm.runInContext(fs.readFileSync('game.js','utf8'),context);
 vm.runInContext(`
 if(state.coins!==100||state.cost!==50||state.zombies.length!==1)throw Error('Initial state');
-buy();if(state.coins!==50||state.cost!==100||state.units.filter(Boolean).length!==1)throw Error('First purchase');
-buy();if(state.coins!==50||state.cost!==100)throw Error('Insufficient coins');
-state.coins=100;buy();select(0);select(1);if(state.units[0]||state.units[1].level!==2||stats(2).damage!==50||stats(2).interval>=1.5)throw Error('Merge');
+buy();if(state.coins!==50||state.cost!==50||state.units.filter(Boolean).length!==1)throw Error('First purchase');
+buy();if(state.coins!==0||state.cost!==100||state.units.filter(Boolean).length!==2)throw Error('Second purchase');
+buy();if(state.coins!==0||state.cost!==100||state.units.filter(Boolean).length!==2)throw Error('Insufficient coins');
+select(0);select(1);if(state.units[0]||state.units[1].level!==2||stats(2).damage!==50||stats(2).interval>=1.5)throw Error('Merge');
 reset();update(4.9);if(state.zombies.length!==1)throw Error('Early spawn');update(.1);if(state.zombies.length!==2)throw Error('5 second spawn');
 reset();state.units[4]={level:1,cooldown:0};state.zombies[0].x=700;state.zombies[0].y=476;update(.01);update(.5);if(state.zombies[0].hp!==75)throw Error('25 damage');
 for(let i=0;i<55;i++)update(.1);if(state.kills!==1||state.coins!==150)throw Error('Kill reward');
 reset();pause();const before=state.spawn;update(5);if(state.spawn!==before)throw Error('Pause');pause();
 state.zombies[0].x=480;state.zombies[0].y=476;update(.1);if(state.lives!==4)throw Error('Camp damage');
 state.units=Array.from({length:9},()=>({level:1,cooldown:0}));state.coins=1000;const costBefore=state.cost;buy();if(state.coins!==1000||state.cost!==costBefore)throw Error('Full board charged');
-reset();for(let i=0;i<19;i++)defeat({x:0,y:0});if(state.progress!==19||state.bossActive)throw Error('Early boss');defeat({x:0,y:0});let boss=state.zombies.find(z=>z.boss);if(state.progress!==20||!boss||boss.hp!==200)throw Error('First boss');const timer=state.spawn;update(.1);if(state.spawn!==timer)throw Error('Boss spawn pause');defeat(boss);if(state.waves!==1||state.progress!==0||state.bossActive)throw Error('Boss completion');state.zombies=[];for(let i=0;i<20;i++)defeat({x:0,y:0});boss=state.zombies.find(z=>z.boss);if(boss.hp!==250||boss.kind!==1)throw Error('Boss scaling and variety');
+reset();for(let i=0;i<19;i++)defeat({x:0,y:0});if(state.progress!==19||state.bossActive)throw Error('Early boss');defeat({x:0,y:0});let boss=state.zombies.find(z=>z.boss);if(state.progress!==20||!boss||boss.hp!==350)throw Error('First boss');const timer=state.spawn;update(.1);if(state.spawn!==timer)throw Error('Boss spawn pause');defeat(boss);if(state.waves!==1||state.progress!==0||state.bossActive||state.spawn!==4.5)throw Error('Boss completion');state.zombies=[];for(let i=0;i<20;i++)defeat({x:0,y:0});boss=state.zombies.find(z=>z.boss);if(boss.hp!==450||boss.kind!==1)throw Error('Boss scaling and variety');
+for(const dodge of [false,true]){
+ reset();buy();state.units[0].cooldown=100;state.zombies=[];spawnBoss();
+ const ogre=state.zombies[0];
+ update(.1);if(ogre.slam?.tile!==0||state.units[0].hp!==100)throw Error('Ogre telegraph');
+ if(dodge){select(0);select(1);}
+ update(1);if(state.units[dodge?1:0].hp!==100)throw Error('Early slam');
+ update(1);if(ogre.slam||state.units[dodge?1:0].hp!==(dodge?100:55))throw Error('Ogre slam impact');
+}
 reset();state.progress=19;state.zombies=[{x:700,y:476,hp:25,maxHp:100}];state.arrows=[{x:700,y:476,target:state.zombies[0],damage:25}];update(.01);if(!state.bossActive||state.progress!==20)throw Error('Arrow triggers boss');boss=state.zombies.find(z=>z.boss);boss.hp=25;state.arrows=[{x:boss.x,y:boss.y,target:boss,damage:25}];update(.01);if(state.waves!==1||state.progress!==0)throw Error('Arrow defeats boss');
 for(const [width,height] of [[390,844],[1440,900],[844,390]]){const view=camera(width,height),p=center(4);canvas.getBoundingClientRect=()=>({left:0,top:0,width,height});if(tile({clientX:p.x*view.scale+view.x,clientY:p.y*view.scale+view.y})!==4)throw Error('Responsive tile mapping');}
 reset();world='forest';worlds={};portalUnlocked=false;travel();if(world!=='forest')throw Error('Locked travel');state.kills=99;defeat({x:0,y:0});if(!portalUnlocked)throw Error('100 kill unlock');state.coins=777;state.units[3]={level:4,cooldown:.4};const forest=state;travel();if(world!=='moon'||state.coins!==100||state.units.some(Boolean)||state.kills!==0||state.spawn!==5)throw Error('Fresh Moon');state.coins=350;state.units[2]={level:2,cooldown:0};const moon=state;travel();if(state!==forest||state.coins!==777||state.units[3].level!==4)throw Error('Forest restore');travel();if(state!==moon||state.coins!==350||state.units[2].level!==2)throw Error('Moon restore');
 canvas.getBoundingClientRect=()=>({left:10,top:20,width:844,height:390});const v=camera(844,390);const point=pointerPosition({clientX:10+420*v.scale+v.x,clientY:20+360*v.scale+v.y});if(Math.abs(point.x-420)>.001||Math.abs(point.y-360)>.001)throw Error('Drag coordinates');
 reset();state.units[0]={level:1,cooldown:0};state.units[1]={level:1,cooldown:0};const first=center(0),second=center(1);const eventAt=p=>({clientX:10+p.x*v.scale+v.x,clientY:20+p.y*v.scale+v.y,pointerId:1});handlers.pointerdown(eventAt(first));handlers.pointermove(eventAt(second));if(!dragPoint||Math.abs(dragPoint.x-second.x)>.001)throw Error('Slime follows pointer');handlers.pointerup(eventAt(second));if(dragPoint||state.units[0]||state.units[1].level!==2)throw Error('Drag merge release');handlers.pointerdown(eventAt(second));handlers.pointercancel();if(dragPoint||drag!==-1||state.units[1].level!==2)throw Error('Drag cancellation');
-reset();state.waves=2;state.zombies=[];state.spawn=.1;update(.1);if(state.zombies.length!==3||state.zombies.some(z=>z.hp!==200||z.maxHp!==200))throw Error('Wave batch and health scaling');
+reset();state.waves=2;state.zombies=[];state.spawn=.1;update(.1);if(state.zombies.length!==3||state.zombies.some(z=>z.hp!==230||z.maxHp!==230)||state.spawn!==4)throw Error('Wave batch, health, and spawn scaling');
+if(spawnInterval(20)!==2.5)throw Error('Minimum spawn interval');
+reset();state.waves=2;state.units[4]={level:1,cooldown:100,hp:100};
+const waveTarget=center(4);
+state.zombies=[{x:waveTarget.x+100,y:waveTarget.y,hp:230,maxHp:230}];
+update(1);if(Math.abs(state.zombies[0].x-(waveTarget.x+74))>.001)throw Error('Wave speed scaling');
+state.zombies[0].x=waveTarget.x+30;
+update(.1);if(state.units[4].hp!==84)throw Error('Wave attack scaling');
 reset();state.zombies=[];state.units[4]={level:1,cooldown:100,hp:100};const defender=center(4);state.zombies=[{x:defender.x+30,y:defender.y,hp:100,maxHp:100,attackCooldown:0}];update(.1);if(state.units[4].hp!==90)throw Error('Enemy attacks slime');update(.5);if(state.units[4].hp!==90)throw Error('Attack cooldown');for(let i=0;i<10;i++)update(1);if(state.units[4]!==null||state.kills!==0||state.coins!==100)throw Error('Slime death');
 reset();buy();state.units[0].hp=10;state.units[1]={level:1,cooldown:0,hp:20};select(0);select(1);if(state.units[1].hp!==100)throw Error('Merge healing');
 reset();state.zombies=[{x:800,y:476,hp:100,maxHp:100}];update(1);if(Math.abs(state.zombies[0].x-778)>.001)throw Error('Faster enemy movement');

@@ -4,33 +4,70 @@ const $=id=>document.getElementById(id);
 const W=960,H=820,grid={x:294,y:290,size:124};
 let world='forest',worlds={},portalUnlocked=false,dragPoint=null;
 let state,selected=-1,cursor=4,keyboard=false,drag=-1,paused=false,last=0,previousPad=[],stickTime=0;
-function reset(){state={coins:100,cost:50,units:Array(9).fill(null),zombies:[],arrows:[],effects:[],spawn:5,kills:0,progress:0,waves:0,bossActive:false,lives:5,time:0};selected=-1;drag=-1;dragPoint=null;paused=false;spawnZombie();$('overlay').hidden=true;$('travel').hidden=true;$('pause').textContent='Ⅱ';message('Recruit an slime to protect your camp.');sync();}
+function reset(){state={coins:100,cost:50,recruits:0,units:Array(9).fill(null),zombies:[],arrows:[],effects:[],spawn:spawnInterval(0),kills:0,progress:0,waves:0,bossActive:false,lives:5,time:0};selected=-1;drag=-1;dragPoint=null;paused=false;spawnZombie();$('overlay').hidden=true;$('travel').hidden=true;$('pause').textContent='Ⅱ';message('Recruit a slime to protect your camp.');sync();}
 function openPortal(){if(!state.lives)return;paused=true;drag=-1;dragPoint=null;$('overlay').hidden=false;$('overlay-title').textContent=world==='moon'?'Return to the forest?':'The Moon portal';$('overlay-text').textContent=world==='moon'?'Your forest crew is waiting exactly where you left it. Your Moon progress will stay here.':portalUnlocked?'Travel to a Moon outpost with aliens and futuristic slimes. Your first visit starts with 100 coins and an empty grid. Your forest progress stays safe.':`Defeat ${100-state.kills} more zombies to unlock the Moon (${state.kills}/100).`;$('travel').hidden=!portalUnlocked;$('travel').textContent=world==='moon'?'Return to forest →':'Travel to the Moon →';$('resume').textContent='Keep playing';$('pause').textContent='▶';sync();}
 function travel(){if(!portalUnlocked)return;worlds[world]=state;world=world==='forest'?'moon':'forest';if(worlds[world])state=worlds[world];else reset();selected=-1;drag=-1;dragPoint=null;paused=false;$('overlay').hidden=true;$('travel').hidden=true;$('pause').textContent='Ⅱ';document.body.classList.toggle('moon',world==='moon');message(world==='moon'?'Moon outpost · Merge space slimes to fight the aliens!':'Welcome back! Your forest crew is just as you left it.');sync();}
 function stats(level){return{damage:25*2**(level-1),interval:Math.max(.22,1.5*.78**(level-1))};}
 function message(t){$('message').textContent=t;}
 function sync(){$('outfit-label').textContent=world==='moon'?'LEVEL 1 · SPACE CADET':'LEVEL 1 · CAVEMAN';$('portal').textContent=world==='moon'?'Portal ↩':portalUnlocked?'Portal ✦':`Portal ${Math.min(state.kills,100)}/100`;$('coins').textContent=state.coins;$('cost').textContent=state.cost;$('kills').textContent=state.kills;$('waves').textContent=state.waves;$('progress').textContent=`${state.progress}/20`;$('boss-fill').style.width=`${state.progress*5}%`;$('boss-meter').setAttribute('aria-valuenow',state.progress);$('boss-label').textContent=state.bossActive?'BOSS BATTLE':'BOSS INCOMING';$('lives').textContent='♥ '.repeat(state.lives)+'♡ '.repeat(5-state.lives);$('buy').disabled=state.coins<state.cost||state.units.every(Boolean)||paused;$('wave').textContent=state.bossActive?`${bossNames[state.waves%bossNames.length]} · BOSS`:`NEXT ${state.waves+1} ${world==='moon'?'ALIEN':'ZOMBIE'}${state.waves?'S':''} · ${Math.ceil(state.spawn)}s`;}
-function buy(){if(paused||state.lives===0)return;if(state.units.every(Boolean)){message('Camp is full! Merge matching slimes to make room.');return;}if(state.coins<state.cost){message('Defeat zombies to earn 50 coins each.');return;}const i=state.units.indexOf(null);state.coins-=state.cost;state.cost+=50;state.units[i]={level:1,cooldown:0,hp:100};burst(center(i).x,center(i).y,'+ SLIME','#deeba7');message('Drag two level 1 slimes together to merge.');sync();}
+function buy(){if(paused||state.lives===0)return;if(state.units.every(Boolean)){message('Camp is full! Merge matching slimes to make room.');return;}if(state.coins<state.cost){message('Defeat zombies to earn 50 coins each.');return;}const i=state.units.indexOf(null);state.coins-=state.cost;state.recruits++;if(state.recruits>1)state.cost+=50;state.units[i]={level:1,cooldown:0,hp:100};burst(center(i).x,center(i).y,'+ SLIME','#deeba7');message('Drag two level 1 slimes together to merge.');sync();}
 function center(i){return{x:grid.x+(i%3+.5)*grid.size,y:grid.y+(Math.floor(i/3)+.5)*grid.size};}
 function select(i){if(paused||i<0)return;keyboard=true;cursor=i;if(selected===i){selected=-1;return;}if(selected>=0){const a=state.units[selected],b=state.units[i];if(a&&!b){state.units[i]=a;state.units[selected]=null;selected=-1;message('Slime moved.');}else if(a&&b&&a.level===b.level){b.level++;b.cooldown=0;b.hp=100;state.units[selected]=null;selected=-1;const s=stats(b.level);burst(center(i).x,center(i).y,'LEVEL UP!','#e3ef9f');message(`Level ${b.level}: ${s.damage} damage · ${s.interval.toFixed(2)}s fire interval.`);}else{selected=state.units[i]?i:-1;message('Match two slimes of the same level to merge.');}}else{selected=state.units[i]?i:-1;if(selected>=0){const s=stats(state.units[i].level);message(`Level ${state.units[i].level} selected · ${s.damage} damage. Choose a matching slime.`);}}sync();}
-function spawnZombie(){for(let i=0;i<=state.waves;i++){const angle=Math.random()*Math.PI*2,hp=100+state.waves*50;state.zombies.push({x:480+Math.cos(angle)*510,y:475+Math.sin(angle)*470,hp,maxHp:hp,attackCooldown:0,wobble:Math.random()*6});}}
+function spawnInterval(waves){return Math.max(2.5,5-waves*.5);}
+function bossHealth(){return 350+state.waves*100;}
+function spawnZombie(){for(let i=0;i<=state.waves;i++){const angle=Math.random()*Math.PI*2,hp=100+state.waves*65;state.zombies.push({x:480+Math.cos(angle)*510,y:475+Math.sin(angle)*470,hp,maxHp:hp,attackCooldown:0,wobble:Math.random()*6});}}
 const bossNames=['Horned Ogre','Bone King','Violet Demon','Stone Golem','Forest Dragon'];
-function spawnBoss(){state.bossActive=true;const hp=200+state.waves*50;state.zombies.push({x:480,y:115,hp,maxHp:hp,boss:true,kind:state.waves%5,wobble:0});message(`${bossNames[state.waves%5]} approaches! ${hp} health.`);burst(480,220,'BOSS INCOMING','#ffb09b');}
-function defeat(z){if(z.boss){state.waves++;state.progress=0;state.bossActive=false;state.spawn=5;state.coins+=150;burst(z.x,z.y,'BOSS DEFEATED +150','#ffe193');message(`Wave ${state.waves} complete! Next boss: ${200+state.waves*50} health.`);}else{state.kills++;if(world==='forest'&&state.kills>=100)portalUnlocked=true;state.coins+=50;burst(z.x,z.y,'+50 coins','#efcf78');if(!state.bossActive){state.progress++;if(state.progress===20)spawnBoss();}}window.RunXR?.score(state.kills);}
+function spawnBoss(){state.bossActive=true;const hp=bossHealth();state.zombies.push({x:480,y:115,hp,maxHp:hp,boss:true,kind:state.waves%5,wobble:0});message(`${bossNames[state.waves%5]} approaches! ${hp} health.`);burst(480,220,'BOSS INCOMING','#ffb09b');}
+function defeat(z){if(z.boss){state.waves++;state.progress=0;state.bossActive=false;state.spawn=spawnInterval(state.waves);state.coins+=150;burst(z.x,z.y,'BOSS DEFEATED +150','#ffe193');message(`Wave ${state.waves} complete! Next boss: ${bossHealth()} health.`);}else{state.kills++;if(world==='forest'&&state.kills>=100)portalUnlocked=true;state.coins+=50;burst(z.x,z.y,'+50 coins','#efcf78');if(!state.bossActive){state.progress++;if(state.progress===20)spawnBoss();}}window.RunXR?.score(state.kills);}
 function burst(x,y,text,color){state.effects.push({x,y,text,color,life:1.4});}
-function update(dt){if(paused||!state.lives)return;state.time+=dt;if(!state.bossActive){state.spawn-=dt;if(state.spawn<=0){spawnZombie();state.spawn+=5;}}for(const z of state.zombies){
+const ogreWindup=2;
+function damageSlime(tile,damage){
+ const u=state.units[tile];
+ if(!u)return;
+ const p=center(tile);
+ u.hp=Math.max(0,(u.hp??100)-damage);
+ burst(p.x,p.y-40,`−${damage} HP`,'#ffb5a2');
+ if(u.hp>0)return;
+ state.units[tile]=null;
+ if(selected===tile)selected=-1;
+ if(drag===tile){drag=-1;dragPoint=null;}
+ burst(p.x,p.y,'SLIME LOST','#ffc6b0');
+ message('A slime fell! Recruit or merge to defend your crew.');
+}
+function update(dt){if(paused||!state.lives)return;state.time+=dt;if(!state.bossActive){state.spawn-=dt;if(state.spawn<=0){spawnZombie();state.spawn+=spawnInterval(state.waves);}}for(const z of state.zombies){
  if(z.hp<=0)continue;
  let target=-1,nearest=Infinity;
  state.units.forEach((u,i)=>{if(!u)return;const p=center(i),distance=Math.hypot(p.x-z.x,p.y-z.y);if(distance<nearest){nearest=distance;target=i;}});
  const destination=target>=0?center(target):{x:480,y:476};
  const dx=destination.x-z.x,dy=destination.y-z.y,d=Math.hypot(dx,dy);
  z.attackCooldown=Math.max(0,(z.attackCooldown||0)-dt);
- if(target>=0&&d<48){
-  if(z.attackCooldown===0){const u=state.units[target],damage=z.boss?25:10;u.hp=Math.max(0,(u.hp??100)-damage);z.attackCooldown=1;burst(destination.x,destination.y-40,`−${damage} HP`,'#ffb5a2');
-   if(u.hp===0){state.units[target]=null;if(selected===target)selected=-1;if(drag===target){drag=-1;dragPoint=null;}burst(destination.x,destination.y,'SLIME LOST','#ffc6b0');message('A slime fell! Recruit or merge to defend your crew.');}
+ if(z.boss&&z.kind===0){
+  if(z.slam){
+   z.slam.remaining-=dt;
+   if(z.slam.remaining<=0){
+    const p=center(z.slam.tile);
+    burst(p.x,p.y,'SLAM!','#ffb09b');
+    damageSlime(z.slam.tile,45);
+    z.slam=null;
+    z.attackCooldown=3;
+   }
+   continue;
   }
+  if(target>=0&&z.attackCooldown===0){
+   z.slam={tile:target,remaining:ogreWindup};
+   message('Ogre slam! Move your slime off the marked tile.');
+   continue;
+  }
+  if(target>=0&&d<48)continue;
+ }
+ if(target>=0&&d<48){
+  if(z.attackCooldown===0){damageSlime(target,z.boss?30:Math.min(25,10+state.waves*3));z.attackCooldown=1;}
  }else if(target<0&&d<130){if(z.boss){state.lives=0;finish();break;}z.hp=0;state.lives--;burst(z.x,z.y,'CAMP HIT','#ffa08e');if(!state.lives){finish();break;}}
- else if(d>0){z.x+=dx/d*(z.boss?13:22)*dt;z.y+=dy/d*(z.boss?13:22)*dt;}
+ else if(d>0){
+  const speed=z.boss?16:Math.min(34,22+state.waves*2);
+  z.x+=dx/d*speed*dt;
+  z.y+=dy/d*speed*dt;
+ }
 }
 state.zombies=state.zombies.filter(z=>z.hp>0);
 state.units.forEach((u,i)=>{if(!u)return;u.cooldown=Math.max(0,u.cooldown-dt);if(u.cooldown>0||!state.zombies.length)return;const p=center(i),target=state.zombies.reduce((a,b)=>Math.hypot(a.x-480,a.y-476)<Math.hypot(b.x-480,b.y-476)?a:b);state.arrows.push({x:p.x,y:p.y-15,target,damage:stats(u.level).damage});u.cooldown=stats(u.level).interval;});
@@ -65,7 +102,15 @@ for(let i=0;i<32;i++){let x=(i*173+42)%W,y=(i*233+65)%H;if(x<130||x>825||y<110||
 [[180,240],[760,650],[205,660],[778,210],[160,430]].forEach(([x,y],i)=>{ellipse(x,y,17,10,'#283c2b66');ellipse(x-3,y-5,15,10,'#78816a');ellipse(x-6,y-9,9,5,'#91947a');});
 if(world==='moon')moonGround();
 label(world==='moon'?'MOON OUTPOST':'THE SAFE SQUARE',480,246,12,'#d3dfb5');line(375,255,585,255,'#9faf7450',1);rect(grid.x-14,grid.y-8,400,392,18,'#223b2866');
-for(let i=0;i<9;i++){const p=center(i),x=p.x-58,y=p.y-58;rect(x,y+6,116,112,10,'#334e2e');rect(x,y,116,112,10,world==='moon'?((i+Math.floor(i/3))%2?'#aebbd1':'#bfc9dc'):((i+Math.floor(i/3))%2?'#85955b':'#8c9c61'));ctx.strokeStyle='#b7c78655';ctx.lineWidth=2;ctx.strokeRect(x+8,y+8,100,96);if(i===selected||(keyboard&&cursor===i)){ctx.strokeStyle=i===selected?'#f2de91':'#dfedb1';ctx.lineWidth=4;ctx.beginPath();ctx.roundRect(x,y,116,112,10);ctx.stroke();}if(!state.units[i]){line(p.x-6,p.y,p.x+6,p.y,'#becb924a',2);line(p.x,p.y-6,p.x,p.y+6,'#becb924a',2);}}
+const openingPair=state.recruits===2&&state.units.filter(u=>u?.level===1).length===2;
+const slam=state.zombies.find(z=>z.slam)?.slam;
+for(let i=0;i<9;i++){const p=center(i),x=p.x-58,y=p.y-58;rect(x,y+6,116,112,10,'#334e2e');rect(x,y,116,112,10,world==='moon'?((i+Math.floor(i/3))%2?'#aebbd1':'#bfc9dc'):((i+Math.floor(i/3))%2?'#85955b':'#8c9c61'));ctx.strokeStyle='#b7c78655';ctx.lineWidth=2;ctx.strokeRect(x+8,y+8,100,96);if(slam?.tile===i){
+ rect(x,y,116,112,10,Math.sin(state.time*20)>0?'#da554bba':'#dc69488c');
+ rect(x+8,y+94,100,9,4,'#672e2d');
+ rect(x+8,y+94,100*slam.remaining/ogreWindup,9,4,'#ffe0b5');
+}else if(openingPair&&state.units[i]?.level===1){
+ ctx.strokeStyle='#fff0a3';ctx.lineWidth=4;ctx.strokeRect(x+8,y+8,100,96);
+}if(i===selected||(keyboard&&cursor===i)){ctx.strokeStyle=i===selected?'#f2de91':'#dfedb1';ctx.lineWidth=4;ctx.beginPath();ctx.roundRect(x,y,116,112,10);ctx.stroke();}if(!state.units[i]){line(p.x-6,p.y,p.x+6,p.y,'#becb924a',2);line(p.x,p.y-6,p.x,p.y+6,'#becb924a',2);}}
 // Fence posts frame the nine deployment tiles.
 for(const x of [277,683])for(const y of [295,410,525,655]){rect(x-5,y-3,10,25,3,'#34422a');rect(x-5,y-8,10,17,3,'#b2a878');}
 state.units.forEach((u,i)=>{if(u&&!(dragPoint&&drag===i)){const p=center(i);person(p.x,p.y-4,u.level);slimeHealth(p.x,p.y,u);}});
@@ -81,7 +126,7 @@ canvas.addEventListener('pointermove',e=>{if(dragPoint&&e.isPrimary!==false)drag
 canvas.addEventListener('pointerup',e=>{if(e.isPrimary===false)return;const end=tile(e);if(drag>=0&&end>=0){if(drag!==end&&state.units[drag]){selected=drag;select(end);}else select(end);}drag=-1;dragPoint=null;});
 canvas.addEventListener('pointercancel',()=>{drag=-1;dragPoint=null;});canvas.addEventListener('lostpointercapture',()=>{drag=-1;dragPoint=null;});
 $('portal').onclick=openPortal;$('travel').onclick=travel;
-$('help').onclick=()=>{if(!state.lives)return;if(!paused)pause();$('overlay-title').textContent='Slime survival guide';$('overlay-text').textContent='Recruit caveman slimes. Drag matching levels together to unlock medieval outfits, double damage, and faster arrows. Every 20 zombie kills brings a monster boss. Defeat it to complete a wave! Touch: tap or drag. Keyboard: arrows, Enter, B. Gamepad: D-pad, A, X.';};$('buy').onclick=buy;$('pause').onclick=pause;$('resume').onclick=()=>state.lives?pause():reset();$('exit').onclick=()=>{if(window.RunXR)window.RunXR.exit();else message('You are playing standalone. Close this tab to exit.');};
+$('help').onclick=()=>{if(!state.lives)return;if(!paused)pause();$('overlay-title').textContent='Slime survival guide';$('overlay-text').textContent='Recruit caveman slimes. Drag matching levels together to unlock medieval outfits, double damage, and faster arrows. Every 20 zombie kills brings a monster boss. After each boss, enemies spawn faster and hit harder. When the Ogre marks a tile, move the slime before the slam. Touch: tap or drag. Keyboard: arrows, Enter, B. Gamepad: D-pad, A, X.';};$('buy').onclick=buy;$('pause').onclick=pause;$('resume').onclick=()=>state.lives?pause():reset();$('exit').onclick=()=>{if(window.RunXR)window.RunXR.exit();else message('You are playing standalone. Close this tab to exit.');};
 function move(dx,dy){keyboard=true;cursor=((Math.floor(cursor/3)+dy+3)%3)*3+(cursor%3+dx+3)%3;}
 window.addEventListener('keydown',e=>{if(e.target.tagName==='BUTTON'&&(e.key==='Enter'||e.key===' '))return;const k=e.key.toLowerCase();if(['arrowup','arrowdown','arrowleft','arrowright',' ','enter','w','a','s','d','b','p','escape'].includes(k))e.preventDefault();if(e.repeat)return;if(k==='o')openPortal();else if(k==='p')pause();else if(k==='escape'){selected=-1;if(window.RunXR)window.RunXR.exit();else if(!paused)pause();}else if(paused){if(k==='enter'||k===' '){if(!$('travel').hidden)travel();else state.lives?pause():reset();}}else if(k==='b')buy();else if(k==='enter'||k===' ')select(cursor);else if(k==='arrowleft'||k==='a')move(-1,0);else if(k==='arrowright'||k==='d')move(1,0);else if(k==='arrowup'||k==='w')move(0,-1);else if(k==='arrowdown'||k==='s')move(0,1);});
 function gamepad(t){const pad=Array.from(navigator.getGamepads?.()||[]).find(Boolean);if(!pad){previousPad=[];return;}const b=pad.buttons.map(v=>v.pressed),pressed=i=>b[i]&&!previousPad[i];if((b[8]&&b[9])||pressed(16)){window.RunXR?.exit();previousPad=b;return;}if(pressed(3))openPortal();if(pressed(9))pause();if(pressed(0)){if(paused){if(!$('travel').hidden)travel();else state.lives?pause():reset();}else select(cursor);}if(pressed(1))selected=-1;if(pressed(2))buy();if(!paused&&t-stickTime>180){const dx=b[14]||pad.axes[0]<-.5?-1:b[15]||pad.axes[0]>.5?1:0,dy=b[12]||pad.axes[1]<-.5?-1:b[13]||pad.axes[1]>.5?1:0;if(dx||dy){move(dx,dy);stickTime=t;}}previousPad=b;}
